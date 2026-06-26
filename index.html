@@ -460,7 +460,7 @@ function renderBar(){
   barChart = new Chart(canvas, {
     type:"bar",
     data:{
-      labels: sorted.map(d=> d.pekerjaan.length>48 ? d.pekerjaan.slice(0,45)+"…" : d.pekerjaan),
+      labels: sorted.map(d=> d.pekerjaan.length>70 ? d.pekerjaan.slice(0,67)+"…" : d.pekerjaan),
       datasets:[{ data: sorted.map(d=>d.progres), backgroundColor: sorted.map(d=>statusColor[d.status]), borderRadius:4, barThickness:14 }]
     },
     options:{
