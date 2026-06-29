@@ -1,538 +1,218 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Monitoring Pekerjaan - RSUP Fatmawati</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<style>
-  :root{
-    --navy-deep:#0a1638;
-    --navy:#102a6b;
-    --navy-mid:#1d3f9e;
-    --cyan:#22d3ee;
-    --red:#ef4444;
-    --amber:#f59e0b;
-    --green:#16a34a;
-    --teal:#06b6d4;
-    --ink:#0f172a;
-    --muted:#64748b;
-    --line:#e7eaf2;
-    --bg:#eef1f8;
-    --card:#ffffff;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0; font-family:'Segoe UI', Inter, system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink);}
-  .wrap{max-width:1440px;margin:0 auto;padding:0 0 28px;}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Monitoring Pekerjaan</title>
 
-  /* HEADER */
-  header{
-    background:linear-gradient(120deg,var(--navy-deep) 0%, var(--navy) 55%, var(--navy-mid) 100%);
-    color:#fff; padding:26px 32px 30px; position:relative; overflow:hidden;
-  }
-  header::after{
-    content:""; position:absolute; right:-60px; top:-40px; width:420px; height:260px;
-    background:repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 18px, transparent 18px 36px);
-    clip-path:polygon(20% 100%, 30% 40%, 45% 60%, 55% 10%, 70% 50%, 85% 20%, 100% 100%);
-    opacity:.5;
-  }
-  .head-row{display:flex; justify-content:space-between; align-items:flex-start; gap:24px; flex-wrap:wrap; position:relative; z-index:1;}
-  .head-titles h1{margin:0; font-size:24px; letter-spacing:.5px; font-weight:800;}
-  .head-titles p{margin:5px 0 0; font-size:13px; color:#bcd0ff; font-weight:500; letter-spacing:.3px; max-width:620px;}
-  .head-titles .org{margin-top:10px; font-size:13px; font-weight:700; color:var(--cyan); letter-spacing:1.5px;}
-  .filters{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;}
-  .filter{
-    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); border-radius:8px;
-    padding:8px 14px; display:flex; flex-direction:column; gap:1px; min-width:118px; backdrop-filter:blur(2px);
-  }
-  .filter select{background:none; border:none; color:#fff; font-size:13px; font-weight:600; font-family:inherit; padding:0; appearance:none; cursor:pointer;}
-  .filter select option{color:#111;}
-  .filter span.lbl{font-size:10.5px; color:#a9bdf2; display:flex; align-items:center; gap:5px;}
-  .refresh-box{display:flex; flex-direction:column; align-items:flex-end; gap:6px;}
-  .refresh-btn{
-    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff;
-    border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;
-  }
-  .refresh-btn:hover{background:rgba(255,255,255,.2);}
-  .refresh-btn.loading .spin{animation:spin 1s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-  .sync-status{font-size:11px; color:#a9bdf2;}
-  .sync-status.error{color:#fca5a5;}
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 
-  /* KPI ROW */
-  .kpis{display:grid; grid-template-columns:repeat(5,1fr); gap:16px; padding:20px 32px 0;}
-  .kpi{background:var(--card); border-radius:14px; padding:16px 18px 14px; box-shadow:0 4px 14px rgba(20,30,70,.06); border:1px solid var(--line); display:flex; flex-direction:column; gap:8px; min-height:118px;}
-  .kpi .top{display:flex; align-items:center; gap:10px;}
-  .icon{width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; color:#fff; flex-shrink:0;}
-  .kpi .label{font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.4px;}
-  .kpi .value{font-size:26px; font-weight:800; line-height:1;}
-  .kpi .sub{font-size:11.5px; color:var(--muted);}
-  .spark{height:26px; margin-top:auto;}
-  .kpi.total .icon{background:#64748b;}
-  .kpi.belum .icon{background:var(--red);}
-  .kpi.berjalan .icon{background:var(--amber);}
-  .kpi.selesai .icon{background:var(--green);}
-  .kpi.rata .icon{background:var(--teal);}
-  .kpi.belum .value{color:var(--red);}
-  .kpi.berjalan .value{color:var(--amber);}
-  .kpi.selesai .value{color:var(--green);}
-  .kpi.rata .value{color:var(--teal);}
-
-  /* MAIN GRID */
-  .grid{display:grid; grid-template-columns:280px 1fr 320px; gap:16px; padding:18px 32px 0; align-items:start;}
-  .panel{background:var(--card); border-radius:14px; border:1px solid var(--line); box-shadow:0 4px 14px rgba(20,30,70,.05); padding:18px 18px 16px;}
-  .panel h3{margin:0 0 14px; font-size:13px; font-weight:800; letter-spacing:.4px; color:var(--navy-deep); display:flex; align-items:center; gap:8px;}
-  .panel h3 .dash{width:5px;height:15px;border-radius:2px;}
-  .legend{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:10px;}
-  .legend li{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600;}
-  .legend .dot{width:11px;height:11px;border-radius:3px;}
-  .legend .pct{margin-left:auto; color:var(--muted); font-weight:700;}
-
-  .bar-head{display:flex; justify-content:space-between; align-items:baseline;}
-  .bar-head span.hint{font-size:11px; color:var(--muted); font-weight:500;}
-
-  table{width:100%; border-collapse:collapse; font-size:12.5px;}
-  thead th{text-align:left; font-size:11px; color:#fff; background:var(--navy); padding:8px 10px; font-weight:700; letter-spacing:.3px;}
-  thead th:first-child{border-radius:6px 0 0 6px;}
-  thead th:last-child{border-radius:0 6px 6px 0;}
-  tbody td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; color:#28324a;}
-  tbody td.col-pekerjaan{max-width:260px;}
-  tbody td.col-kendala, tbody td.col-tindak{max-width:200px;}
-  tbody tr:hover{background:#f6f8fd;}
-  .badge{padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-block; white-space:nowrap;}
-  .badge.belum{background:#fde2e2; color:#c1272d;}
-  .badge.berjalan{background:#fdebcd; color:#b3760c;}
-  .badge.selesai{background:#d7f3df; color:#15803d;}
-  .progress-cell{display:flex; align-items:center; gap:8px; min-width:90px;}
-  .progress-track{flex:1; height:7px; border-radius:5px; background:#e7eaf2; overflow:hidden;}
-  .progress-fill{height:100%; border-radius:5px;}
-
-  .side-row{display:flex; flex-direction:column; gap:0; border-bottom:1px solid var(--line); padding:9px 0;}
-  .side-row:last-child{border-bottom:none;}
-  .side-row .name{font-size:12.5px; font-weight:700; color:var(--navy-deep); display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;}
-  .side-row .detail{font-size:12px; color:var(--muted); margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
-  .side-table-head{display:flex; font-size:10.5px; font-weight:700; color:#fff; background:var(--navy); border-radius:6px; padding:7px 10px; margin-bottom:2px;}
-  .side-table-head span:first-child{flex:1.3;}
-  .side-table-head span:last-child{flex:1;}
-  .btn-link{display:block; text-align:center; margin-top:12px; padding:9px; background:#eef2ff; color:var(--navy); border:1px solid #d7deff; border-radius:8px; font-size:12.5px; font-weight:700; cursor:pointer; transition:.15s;}
-  .btn-link:hover{background:#dfe7ff;}
-
-  .pagination{display:flex; justify-content:flex-end; align-items:center; gap:14px; padding:10px 6px 0; font-size:12px; color:var(--muted);}
-  .pagination button{border:1px solid var(--line); background:#fff; border-radius:6px; width:26px; height:26px; cursor:pointer; color:var(--navy);}
-  .pagination button:disabled{color:#c7cee0; cursor:not-allowed;}
-
-  footer{margin-top:22px; padding:14px 32px; background:var(--navy-deep); color:#bcd0ff; text-align:center; font-size:12px;}
-  footer a{color:var(--cyan); text-decoration:none;}
-
-  .banner{margin:18px 32px 0; padding:12px 16px; border-radius:10px; font-size:13px; display:none; align-items:center; gap:10px;}
-  .banner.show{display:flex;}
-  .banner.error{background:#fde2e2; color:#9f1c24; border:1px solid #f8b4b4;}
-  .banner.loading{background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe;}
-  .banner button{margin-left:auto; background:#fff; border:1px solid currentColor; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; color:inherit;}
-
-  @media (max-width:1100px){
-    .kpis{grid-template-columns:repeat(2,1fr);}
-    .grid{grid-template-columns:1fr;}
-  }
-</style>
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="wrap">
 
+  <!-- ── HEADER ── -->
   <header>
-    <div class="head-row">
-      <div class="head-titles">
-        <h1>DASHBOARD MONITORING PEKERJAAN</h1>
-        <p>INSTALASI PENGELOLAAN INOVASI DAN KEKAYAAN INTELEKTUAL — data live dari Google Sheets</p>
-        <div class="org">RSUP FATMAWATI</div>
+    <div class="head-left">
+      <div class="head-logo">🌿</div>
+      <div>
+        <div class="head-title">Dashboard Monitoring Pekerjaan</div>
+        <div class="head-sub">Instalasi Pengelolaan Inovasi dan Kekayaan Intelektual</div>
       </div>
-      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
-        <div class="filters">
-          <div class="filter"><span class="lbl">📅 Triwulan</span><select id="fTriwulan"><option value="">Semua</option></select></div>
-          <div class="filter"><span class="lbl">📅 Bulan</span><select id="fBulan"><option value="">Semua</option></select></div>
-          <div class="filter"><span class="lbl">🗓️ Minggu Ke</span><select id="fMinggu"><option value="">Semua</option></select></div>
-          <div class="filter"><span class="lbl">▼ Status</span><select id="fStatus"><option value="">Semua</option></select></div>
-        </div>
-        <div class="refresh-box">
-          <button class="refresh-btn" id="refreshBtn"><span class="spin">⟳</span> Refresh</button>
-          <span class="sync-status" id="syncStatus">Memuat data…</span>
-        </div>
+    </div>
+    <div class="head-right">
+      <div class="date-box">
+        <span>📅</span>
+        <span id="syncStatus">Memuat data…</span>
       </div>
+      <button class="refresh-btn" id="refreshBtn" title="Refresh">
+        <span class="spin">⟳</span>
+      </button>
     </div>
   </header>
 
+  <!-- ── BANNER NOTIFIKASI ── -->
   <div class="banner loading" id="loadingBanner">⟳ Mengambil data terbaru dari Google Sheets…</div>
-  <div class="banner error" id="errorBanner">⚠️ <span id="errorMsg">Gagal memuat data.</span><button id="retryBtn">Coba lagi</button></div>
-
-  <!-- KPI CARDS -->
-  <div class="kpis">
-    <div class="kpi total"><div class="top"><div class="icon">📋</div><div class="label">TOTAL PEKERJAAN</div></div><div class="value" id="kpiTotal">0</div><div class="sub">sesuai filter terpilih</div><canvas class="spark" id="spark0"></canvas></div>
-    <div class="kpi belum"><div class="top"><div class="icon">⏱️</div><div class="label">BELUM MULAI</div></div><div class="value" id="kpiBelum">0</div><div class="sub" id="kpiBelumPct">0% dari total pekerjaan</div><canvas class="spark" id="spark1"></canvas></div>
-    <div class="kpi berjalan"><div class="top"><div class="icon">⚙️</div><div class="label">BERJALAN</div></div><div class="value" id="kpiBerjalan">0</div><div class="sub" id="kpiBerjalanPct">0% dari total pekerjaan</div><canvas class="spark" id="spark2"></canvas></div>
-    <div class="kpi selesai"><div class="top"><div class="icon">✔️</div><div class="label">SELESAI</div></div><div class="value" id="kpiSelesai">0</div><div class="sub" id="kpiSelesaiPct">0% dari total pekerjaan</div><canvas class="spark" id="spark3"></canvas></div>
-    <div class="kpi rata"><div class="top"><div class="icon">📈</div><div class="label">RATA-RATA PROGRES</div></div><div class="value" id="kpiRata">0%</div><div class="sub">Rata-rata seluruh pekerjaan</div><canvas class="spark" id="spark4"></canvas></div>
+  <div class="banner error"   id="errorBanner">
+    ⚠️ <span id="errorMsg">Gagal memuat data.</span>
+    <button id="retryBtn">Coba lagi</button>
   </div>
 
-  <!-- MAIN GRID -->
-  <div class="grid">
-    <div class="panel">
-      <h3><span class="dash" style="background:var(--navy)"></span>RINGKASAN STATUS</h3>
-      <canvas id="donutChart" height="180"></canvas>
-      <ul class="legend" id="legendList"></ul>
-    </div>
+  <div class="page-body">
 
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <div class="panel">
-        <div class="bar-head">
-          <h3><span class="dash" style="background:var(--navy)"></span>PROGRES PEKERJAAN PER KEGIATAN</h3>
-          <span class="hint">Urut berdasarkan progres tertinggi</span>
+    <!-- ── KPI CARDS ── -->
+    <div class="kpi-row">
+
+      <div class="kpi-card">
+        <div class="kpi-icon blue">📋</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Total Pekerjaan</div>
+          <div class="kpi-value blue" id="kpiTotal">0</div>
+          <div class="kpi-sub">Semua Pekerjaan</div>
         </div>
-        <div style="position:relative;"><canvas id="barChart"></canvas></div>
       </div>
 
+      <div class="kpi-card">
+        <div class="kpi-icon green">✔</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Selesai</div>
+          <div class="kpi-value green" id="kpiSelesai">0</div>
+          <div class="kpi-sub" id="kpiSelesaiPct">0% dari total</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon amber">🕐</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Proses</div>
+          <div class="kpi-value amber" id="kpiBerjalan">0</div>
+          <div class="kpi-sub" id="kpiBerjalanPct">0% dari total</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon red">⚠</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Terlambat</div>
+          <div class="kpi-value red" id="kpiBelum">0</div>
+          <div class="kpi-sub" id="kpiBelumPct">0% dari total</div>
+        </div>
+      </div>
+
+    </div><!-- /kpi-row -->
+
+    <!-- ── PROGRESS + STATUS DONUT ── -->
+    <div class="mid-row">
+
+      <!-- Progress List -->
       <div class="panel">
-        <h3><span class="dash" style="background:var(--navy)"></span>DAFTAR PEKERJAAN</h3>
-        <div style="overflow-x:auto;">
+        <div class="panel-head">
+          <span class="panel-title">PROGRESS PEKERJAAN</span>
+          <select class="select-sm" id="progFilter">
+            <option value="50">Top 50 Pekerjaan</option>
+            <option value="20">Top 20 Pekerjaan</option>
+            <option value="10">Top 10 Pekerjaan</option>
+            <option value="999">Semua</option>
+          </select>
+        </div>
+        <div class="panel-body">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">
+            <span>Nama Pekerjaan</span>
+            <span>Progress (%)</span>
+          </div>
+          <div class="prog-list" id="progList" style="max-height:280px;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- Status Donut -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">STATUS PEKERJAAN</span>
+        </div>
+        <div class="panel-body">
+          <div class="status-wrap">
+            <div class="donut-container">
+              <canvas id="donutChart"></canvas>
+            </div>
+            <table class="status-table">
+              <tbody>
+                <tr>
+                  <td><div class="row-label"><span class="dot" style="background:#16a34a"></span>Selesai</div></td>
+                  <td class="row-num" id="stSelesai">0</td>
+                  <td class="row-pct" id="stSelesaiPct">0%</td>
+                </tr>
+                <tr>
+                  <td><div class="row-label"><span class="dot" style="background:#f59e0b"></span>Proses</div></td>
+                  <td class="row-num" id="stBerjalan">0</td>
+                  <td class="row-pct" id="stBerjalanPct">0%</td>
+                </tr>
+                <tr>
+                  <td><div class="row-label"><span class="dot" style="background:#ef4444"></span>Terlambat</div></td>
+                  <td class="row-num" id="stBelum">0</td>
+                  <td class="row-pct" id="stBelumPct">0%</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style="font-weight:700;">Total</td>
+                  <td class="row-num" id="stTotal">0</td>
+                  <td class="row-pct">100%</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /mid-row -->
+
+    <!-- ── SEARCH + TABEL PEKERJAAN ── -->
+    <div class="panel">
+      <div class="panel-body" style="padding-bottom:0;">
+        <div class="search-bar">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Cari pekerjaan…">
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:12px;">
         <table>
-          <thead><tr><th>Pekerjaan</th><th>Status</th><th>Progres</th><th>Kendala</th><th>Tindak Lanjut</th><th>Update</th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width:44px;">No</th>
+              <th>Nama Pekerjaan</th>
+              <th style="width:110px;">Status</th>
+              <th style="width:80px;">Progress</th>
+              <th style="width:200px;"></th>
+              <th style="width:120px;">Target</th>
+              <th style="width:110px;">Aksi</th>
+            </tr>
+          </thead>
           <tbody id="mainTableBody"></tbody>
         </table>
-        </div>
-        <div class="pagination">
-          <span id="pageInfo">0 / 0</span>
-          <button id="prevPage">‹</button>
-          <button id="nextPage">›</button>
-        </div>
+      </div>
+      <div class="pagination">
+        <span class="info" id="pageInfo">Menampilkan 0 dari 0 pekerjaan</span>
+        <button class="pg-btn" id="prevPage" disabled>‹</button>
+        <div id="pgNumbers" style="display:flex;gap:4px;"></div>
+        <button class="pg-btn" id="nextPage" disabled>›</button>
       </div>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <div class="panel">
-        <h3><span class="dash" style="background:var(--red)"></span>⚠️ DAFTAR KENDALA UTAMA</h3>
-        <div class="side-table-head"><span>Nama Kegiatan/Pekerjaan</span><span>Kendala</span></div>
-        <div id="kendalaList"></div>
+    <!-- ── KENDALA & TINDAK LANJUT ── -->
+    <div class="bottom-row">
+
+      <div class="accordion">
+        <div class="acc-head open" id="kendalaHead" onclick="toggleAcc('kendala')">
+          <span>DAFTAR KENDALA</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="acc-body" id="kendalaBody">
+          <div id="kendalaList"></div>
+        </div>
       </div>
-      <div class="panel">
-        <h3><span class="dash" style="background:var(--green)"></span>✅ TINDAK LANJUT AKTIF</h3>
-        <div class="side-table-head"><span>Nama Kegiatan/Pekerjaan</span><span>Tindak Lanjut</span></div>
-        <div id="tindakList"></div>
+
+      <div class="accordion">
+        <div class="acc-head open" id="tindakHead" onclick="toggleAcc('tindak')">
+          <span>TINDAK LANJUT</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="acc-body" id="tindakBody">
+          <div id="tindakList"></div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <footer>ℹ️ Data ditarik secara live dari Google Sheets <strong>"DATABASE PELAPORAN PEKERJAAN MINGGUAN INSTALASI PENGELOLAAN INOVASI DAN KEKAYAAN INTELEKTUAL RSUP FATMAWATI"</strong>. Dashboard otomatis sinkron tiap 5 menit, atau klik Refresh untuk update manual.</footer>
-</div>
+    </div><!-- /bottom-row -->
 
-<script>
-/* ====================== KONFIGURASI ======================
-   Ganti SHEET_ID dan GID sesuai spreadsheet kamu.
-   SHEET_ID diambil dari URL: docs.google.com/spreadsheets/d/<SHEET_ID>/edit
-   GID diambil dari URL setelah #gid= (tab/sheet yang dipakai)
-   Sheet WAJIB di-share minimal "Anyone with the link - Viewer".
-   ============================================================ */
-const SHEET_ID = "1BLZmMk9v5d7uXZlTn35vMvfQM7AZ5rpUwFXI35tVG58";
-const GID = "0";
-const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 menit
+  </div><!-- /page-body -->
 
-// Mapping nama kolom di Google Sheet -> field internal dashboard
-const COLUMN_MAP = {
-  "ID": "id",
-  "Triwulan": "triwulan",
-  "Bulan": "bulan",
-  "Minggu ke": "minggu",
-  "Nama Kegiatan/Pekerjaan": "pekerjaan",
-  "Progres (%)": "progres",
-  "Status": "status",
-  "Kendala": "kendala",
-  "Tindak Lanjut": "tindak",
-  "Tanggal Update": "tanggal"
-};
+  <footer>Data ditarik dari Google Sheets · Sinkron otomatis tiap 5 menit</footer>
 
-const statusColor = {"Belum Mulai":"#ef4444","Berjalan":"#f59e0b","Selesai":"#16a34a"};
-const statusBadge = {"Belum Mulai":"belum","Berjalan":"berjalan","Selesai":"selesai"};
+</div><!-- /wrap -->
 
-let RAW_DATA = [];
-let filtered = [];
-let currentPage = 1;
-const PAGE_SIZE = 8;
-let donutChart, barChart;
-let refreshTimer = null;
-
-/* ---------------- FETCH DATA VIA GOOGLE VISUALIZATION API (JSONP) ---------------- */
-function loadSheetData(){
-  return new Promise((resolve, reject)=>{
-    const callbackName = "gsCallback_" + Date.now();
-    const timeout = setTimeout(()=>{
-      cleanup();
-      reject(new Error("Waktu permintaan habis. Periksa koneksi atau izin akses spreadsheet."));
-    }, 15000);
-
-    function cleanup(){
-      delete window[callbackName];
-      if(script.parentNode) script.parentNode.removeChild(script);
-      clearTimeout(timeout);
-    }
-
-    window[callbackName] = function(response){
-      cleanup();
-      try{
-        if(response.status === "error"){
-          reject(new Error("Google Sheets menolak permintaan. Pastikan sharing diset ke 'Anyone with the link'."));
-          return;
-        }
-        const table = response.table;
-        const headers = table.cols.map(c => (c.label || c.id || "").trim());
-        const rows = table.rows.map(r => r.c.map(cell => {
-          if(!cell) return "";
-          if(cell.f !== undefined && cell.f !== null) return cell.f;
-          return cell.v !== undefined && cell.v !== null ? cell.v : "";
-        }));
-        resolve({headers, rows});
-      }catch(e){ reject(e); }
-    };
-
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&headers=1&tqx=responseHandler:${callbackName}`;
-    const script = document.createElement("script");
-    script.src = url;
-    script.onerror = ()=>{ cleanup(); reject(new Error("Gagal menghubungi Google Sheets. Cek SHEET_ID/GID dan koneksi internet.")); };
-    document.body.appendChild(script);
-  });
-}
-
-function rowsToData(headers, rows){
-  const idx = {};
-  headers.forEach((h,i)=>{
-    const key = COLUMN_MAP[h.trim()];
-    if(key) idx[key] = i;
-  });
-
-  return rows
-    .map(r => {
-      const get = (k)=> idx[k] !== undefined ? String(r[idx[k]] ?? "").trim() : "";
-      const pekerjaan = get("pekerjaan");
-      if(!pekerjaan) return null;
-      let progres = parseFloat(String(get("progres")).replace("%","").replace(",", "."));
-      if(isNaN(progres)) progres = 0;
-      let status = get("status") || (progres>=100 ? "Selesai" : progres>0 ? "Berjalan" : "Belum Mulai");
-      if(!statusColor[status]) status = progres>=100 ? "Selesai" : progres>0 ? "Berjalan" : "Belum Mulai";
-      return {
-        id: get("id"),
-        triwulan: get("triwulan"),
-        bulan: get("bulan"),
-        minggu: get("minggu"),
-        pekerjaan,
-        progres: Math.max(0, Math.min(100, progres)),
-        status,
-        kendala: get("kendala"),
-        tindak: get("tindak"),
-        tanggal: get("tanggal")
-      };
-    })
-    .filter(Boolean);
-}
-
-/* ---------------- UI STATE ---------------- */
-function setLoading(isLoading){
-  document.getElementById("loadingBanner").classList.toggle("show", isLoading);
-  document.getElementById("refreshBtn").classList.toggle("loading", isLoading);
-  if(isLoading) document.getElementById("errorBanner").classList.remove("show");
-}
-function setError(msg){
-  document.getElementById("errorBanner").classList.add("show");
-  document.getElementById("errorMsg").textContent = msg;
-  document.getElementById("syncStatus").textContent = "Gagal sinkron";
-  document.getElementById("syncStatus").classList.add("error");
-}
-function setSynced(){
-  document.getElementById("errorBanner").classList.remove("show");
-  document.getElementById("syncStatus").classList.remove("error");
-  const now = new Date();
-  document.getElementById("syncStatus").textContent = "Tersinkron pukul " + now.toLocaleTimeString("id-ID");
-}
-
-async function refresh(){
-  setLoading(true);
-  try{
-    const {headers, rows} = await loadSheetData();
-    const data = rowsToData(headers, rows);
-    if(data.length === 0){
-      throw new Error("Tidak ada baris data terbaca. Periksa nama kolom di header sheet sesuai konfigurasi.");
-    }
-    RAW_DATA = data;
-    rebuildFilterOptions();
-    applyFilters();
-    setSynced();
-  }catch(e){
-    console.error(e);
-    setError(e.message || "Terjadi kesalahan saat mengambil data.");
-  }finally{
-    setLoading(false);
-  }
-}
-
-document.getElementById("refreshBtn").addEventListener("click", refresh);
-document.getElementById("retryBtn").addEventListener("click", refresh);
-
-/* ---------------- FILTERS ---------------- */
-function uniq(arr,key){ return [...new Set(arr.map(d=>d[key]).filter(Boolean))]; }
-function rebuildFilterOptions(){
-  fillSelect("fTriwulan", uniq(RAW_DATA,"triwulan"));
-  fillSelect("fBulan", uniq(RAW_DATA,"bulan"));
-  fillSelect("fMinggu", uniq(RAW_DATA,"minggu"));
-  fillSelect("fStatus", uniq(RAW_DATA,"status"));
-}
-function fillSelect(id, values){
-  const sel = document.getElementById(id);
-  const current = sel.value;
-  sel.innerHTML = '<option value="">Semua</option>';
-  values.forEach(v=>{
-    const opt = document.createElement("option");
-    opt.value = v; opt.textContent = v;
-    sel.appendChild(opt);
-  });
-  if(values.includes(current)) sel.value = current;
-}
-["fTriwulan","fBulan","fMinggu","fStatus"].forEach(id=>{
-  document.getElementById(id).addEventListener("change", applyFilters);
-});
-
-function applyFilters(){
-  const t = document.getElementById("fTriwulan").value;
-  const b = document.getElementById("fBulan").value;
-  const m = document.getElementById("fMinggu").value;
-  const s = document.getElementById("fStatus").value;
-  filtered = RAW_DATA.filter(d =>
-    (!t || d.triwulan===t) && (!b || d.bulan===b) && (!m || d.minggu===m) && (!s || d.status===s)
-  );
-  currentPage = 1;
-  renderAll();
-}
-
-/* ---------------- RENDER ---------------- */
-function renderAll(){
-  renderKPIs(); renderDonut(); renderBar(); renderTable(); renderKendala(); renderTindak();
-}
-
-function renderKPIs(){
-  const total = filtered.length;
-  const belum = filtered.filter(d=>d.status==="Belum Mulai").length;
-  const berjalan = filtered.filter(d=>d.status==="Berjalan").length;
-  const selesai = filtered.filter(d=>d.status==="Selesai").length;
-  const rata = total ? (filtered.reduce((s,d)=>s+d.progres,0)/total) : 0;
-  const pct = n => total ? ((n/total)*100).toFixed(1).replace(".",",") : "0";
-
-  document.getElementById("kpiTotal").textContent = total;
-  document.getElementById("kpiBelum").textContent = belum;
-  document.getElementById("kpiBerjalan").textContent = berjalan;
-  document.getElementById("kpiSelesai").textContent = selesai;
-  document.getElementById("kpiRata").textContent = (Math.round(rata*10)/10) + "%";
-  document.getElementById("kpiBelumPct").textContent = pct(belum)+"% dari total pekerjaan";
-  document.getElementById("kpiBerjalanPct").textContent = pct(berjalan)+"% dari total pekerjaan";
-  document.getElementById("kpiSelesaiPct").textContent = pct(selesai)+"% dari total pekerjaan";
-}
-
-function renderDonut(){
-  const belum = filtered.filter(d=>d.status==="Belum Mulai").length;
-  const berjalan = filtered.filter(d=>d.status==="Berjalan").length;
-  const selesai = filtered.filter(d=>d.status==="Selesai").length;
-  const total = filtered.length || 1;
-
-  document.getElementById("legendList").innerHTML = [
-    {label:"Belum Mulai", color:"var(--red)", n:belum},
-    {label:"Berjalan", color:"var(--amber)", n:berjalan},
-    {label:"Selesai", color:"var(--green)", n:selesai},
-  ].map(it=>`<li><span class="dot" style="background:${it.color}"></span>${it.label} <span class="pct">${((it.n/total)*100).toFixed(1).replace(".",",")}% (${it.n})</span></li>`).join("");
-
-  if(donutChart) donutChart.destroy();
-  donutChart = new Chart(document.getElementById("donutChart"), {
-    type:"doughnut",
-    data:{ labels:["Belum Mulai","Berjalan","Selesai"], datasets:[{ data:[belum,berjalan,selesai], backgroundColor:["#ef4444","#f59e0b","#16a34a"], borderWidth:3, borderColor:"#fff" }] },
-    options:{ cutout:"62%", plugins:{ legend:{display:false} } }
-  });
-}
-
-function renderBar(){
-  const sorted = [...filtered].sort((a,b)=>b.progres-a.progres);
-  if(barChart) barChart.destroy();
-  const canvas = document.getElementById("barChart");
-  canvas.parentElement.style.height = Math.max(220, sorted.length*26) + "px";
-  canvas.style.height = "100%";
-  barChart = new Chart(canvas, {
-    type:"bar",
-    data:{
-      labels: sorted.map(d=> d.pekerjaan.length>70 ? d.pekerjaan.slice(0,67)+"…" : d.pekerjaan),
-      datasets:[{ data: sorted.map(d=>d.progres), backgroundColor: sorted.map(d=>statusColor[d.status]), borderRadius:4, barThickness:14 }]
-    },
-    options:{
-      indexAxis:"y", maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ callbacks:{
-        title:(items)=> sorted[items[0].dataIndex].pekerjaan,
-        label:(ctx)=>ctx.parsed.x+"% - "+sorted[ctx.dataIndex].status
-      }}},
-      scales:{ x:{min:0,max:100, ticks:{callback:(v)=>v+"%"}, grid:{color:"#eef1f8"}}, y:{grid:{display:false}, ticks:{font:{size:10.5}}} }
-    }
-  });
-}
-
-function renderTable(){
-  const tbody = document.getElementById("mainTableBody");
-  const start = (currentPage-1)*PAGE_SIZE;
-  const pageItems = filtered.slice(start, start+PAGE_SIZE);
-  tbody.innerHTML = pageItems.map(d=>`
-    <tr>
-      <td class="col-pekerjaan"><span title="${escapeHtml(d.pekerjaan)}">${escapeHtml(d.pekerjaan)}</span></td>
-      <td><span class="badge ${statusBadge[d.status]}">${escapeHtml(d.status)}</span></td>
-      <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:${d.progres}%; background:${statusColor[d.status]}"></div></div><span style="font-weight:700; font-size:11.5px; min-width:32px;">${d.progres}%</span></div></td>
-      <td class="col-kendala"><span title="${escapeHtml(d.kendala)}">${escapeHtml(d.kendala) || "-"}</span></td>
-      <td class="col-tindak"><span title="${escapeHtml(d.tindak)}">${escapeHtml(d.tindak) || "-"}</span></td>
-      <td>${escapeHtml(d.tanggal) || "-"}</td>
-    </tr>`).join("");
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
-  const end = Math.min(start+PAGE_SIZE, filtered.length);
-  document.getElementById("pageInfo").textContent = filtered.length ? `${start+1} – ${end} / ${filtered.length}` : "0 / 0";
-  document.getElementById("prevPage").disabled = currentPage<=1;
-  document.getElementById("nextPage").disabled = currentPage>=totalPages;
-}
-document.getElementById("prevPage").addEventListener("click", ()=>{ if(currentPage>1){ currentPage--; renderTable(); }});
-document.getElementById("nextPage").addEventListener("click", ()=>{ const totalPages = Math.max(1, Math.ceil(filtered.length/PAGE_SIZE)); if(currentPage<totalPages){ currentPage++; renderTable(); }});
-
-function renderKendala(){
-  const list = filtered.filter(d=>d.kendala && d.kendala.trim()!=="");
-  document.getElementById("kendalaList").innerHTML = list.slice(0,7).map(d=>
-    `<div class="side-row"><div class="name">${escapeHtml(d.pekerjaan)}</div><div class="detail">${escapeHtml(d.kendala)}</div></div>`
-  ).join("") || '<div class="side-row"><div class="detail">Tidak ada kendala tercatat.</div></div>';
-}
-function renderTindak(){
-  const list = filtered.filter(d=>d.tindak && d.tindak.trim()!=="");
-  document.getElementById("tindakList").innerHTML = list.slice(0,7).map(d=>
-    `<div class="side-row"><div class="name">${escapeHtml(d.pekerjaan)}</div><div class="detail">${escapeHtml(d.tindak)}</div></div>`
-  ).join("") || '<div class="side-row"><div class="detail">Tidak ada tindak lanjut tercatat.</div></div>';
-}
-
-function escapeHtml(str){
-  if(str === undefined || str === null) return "";
-  return String(str).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
-/* Sparklines (statis - dekorasi tren) */
-function spark(id, color, vals){
-  new Chart(document.getElementById(id), {
-    type:"line",
-    data:{ labels:vals.map((_,i)=>i), datasets:[{ data:vals, borderColor:color, backgroundColor:color+"33", fill:true, tension:.4, pointRadius:0, borderWidth:2 }]},
-    options:{ plugins:{legend:{display:false}, tooltip:{enabled:false}}, scales:{x:{display:false}, y:{display:false}} }
-  });
-}
-spark("spark0","#64748b",[10,12,13,15,16,17,18,19]);
-spark("spark1","#ef4444",[1,1,0,0,0,0,0,0]);
-spark("spark2","#f59e0b",[3,4,4,5,5,6,6,6]);
-spark("spark3","#16a34a",[6,8,9,10,11,12,13,13]);
-spark("spark4","#06b6d4",[70,75,80,84,86,88,90,91]);
-
-/* ---------------- INIT ---------------- */
-refresh();
-refreshTimer = setInterval(refresh, AUTO_REFRESH_MS);
-</script>
-
+<!-- JavaScript utama (letakkan setelah semua elemen HTML) -->
+<script src="app.js"></script>
 </body>
 </html>
