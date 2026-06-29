@@ -4,11 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Monitoring Pekerjaan</title>
-
-  <!-- Chart.js (CDN) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,10 +13,26 @@
   <!-- ── HEADER ── -->
   <header>
     <div class="head-left">
-      <div class="head-logo">🌿</div>
+      <!-- Logo RSUP Fatmawati (SVG inline) -->
+      <div class="head-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="44" height="44">
+          <!-- Daun kiri bawah (hijau teal) -->
+          <ellipse cx="22" cy="52" rx="18" ry="10" fill="#00b4a6" transform="rotate(-40 22 52)"/>
+          <!-- Daun kanan bawah (kuning-hijau) -->
+          <ellipse cx="58" cy="52" rx="18" ry="10" fill="#c8d400" transform="rotate(40 58 52)"/>
+          <!-- Daun kiri atas (biru teal) -->
+          <ellipse cx="22" cy="28" rx="18" ry="10" fill="#00b4a6" transform="rotate(40 22 28)"/>
+          <!-- Daun kanan atas (hijau teal lebih muda) -->
+          <ellipse cx="58" cy="28" rx="18" ry="10" fill="#00cfc0" transform="rotate(-40 58 28)"/>
+          <!-- Lingkaran tengah merah -->
+          <circle cx="40" cy="40" r="9" fill="#e8003d"/>
+          <!-- Anak panah putih ke kiri -->
+          <polygon points="44,40 38,35 38,45" fill="white"/>
+        </svg>
+      </div>
       <div>
         <div class="head-title">Dashboard Monitoring Pekerjaan</div>
-        <div class="head-sub">Instalasi Pengelolaan Inovasi dan Kekayaan Intelektual</div>
+        <div class="head-sub">RSUP Fatmawati — Instalasi Pengelolaan Inovasi dan Kekayaan Intelektual</div>
       </div>
     </div>
     <div class="head-right">
@@ -34,6 +46,43 @@
     </div>
   </header>
 
+  <!-- ── FILTER BAR ── -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-icon">📅</span>
+      <div class="filter-label">Triwulan</div>
+      <select id="filterTriwulan" class="filter-select">
+        <option value="">Semua</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-icon">🗓</span>
+      <div class="filter-label">Bulan</div>
+      <select id="filterBulan" class="filter-select">
+        <option value="">Semua</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-icon">📆</span>
+      <div class="filter-label">Minggu Ke</div>
+      <select id="filterMinggu" class="filter-select">
+        <option value="">Semua</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-icon">▼</span>
+      <div class="filter-label">Status</div>
+      <select id="filterStatus" class="filter-select">
+        <option value="">Semua</option>
+        <option value="Selesai">Selesai</option>
+        <option value="Berjalan">Proses</option>
+        <option value="Terlambat">Terlambat</option>
+        <option value="Belum Mulai">Belum Mulai</option>
+      </select>
+    </div>
+    <button class="filter-reset" id="resetFilter" title="Reset semua filter">✕ Reset</button>
+  </div>
+
   <!-- ── BANNER NOTIFIKASI ── -->
   <div class="banner loading" id="loadingBanner">⟳ Mengambil data terbaru dari Google Sheets…</div>
   <div class="banner error"   id="errorBanner">
@@ -45,7 +94,6 @@
 
     <!-- ── KPI CARDS ── -->
     <div class="kpi-row">
-
       <div class="kpi-card">
         <div class="kpi-icon blue">📋</div>
         <div class="kpi-body">
@@ -54,7 +102,6 @@
           <div class="kpi-sub">Semua Pekerjaan</div>
         </div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-icon green">✔</div>
         <div class="kpi-body">
@@ -63,7 +110,6 @@
           <div class="kpi-sub" id="kpiSelesaiPct">0% dari total</div>
         </div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-icon amber">🕐</div>
         <div class="kpi-body">
@@ -72,7 +118,6 @@
           <div class="kpi-sub" id="kpiBerjalanPct">0% dari total</div>
         </div>
       </div>
-
       <div class="kpi-card">
         <div class="kpi-icon red">⚠</div>
         <div class="kpi-body">
@@ -81,13 +126,10 @@
           <div class="kpi-sub" id="kpiBelumPct">0% dari total</div>
         </div>
       </div>
-
-    </div><!-- /kpi-row -->
+    </div>
 
     <!-- ── PROGRESS + STATUS DONUT ── -->
     <div class="mid-row">
-
-      <!-- Progress List -->
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">PROGRESS PEKERJAAN</span>
@@ -107,7 +149,6 @@
         </div>
       </div>
 
-      <!-- Status Donut -->
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">STATUS PEKERJAAN</span>
@@ -146,15 +187,14 @@
           </div>
         </div>
       </div>
-
-    </div><!-- /mid-row -->
+    </div>
 
     <!-- ── SEARCH + TABEL PEKERJAAN ── -->
     <div class="panel">
       <div class="panel-body" style="padding-bottom:0;">
         <div class="search-bar">
           <span>🔍</span>
-          <input type="text" id="searchInput" placeholder="Cari pekerjaan…">
+          <input type="text" id="searchInput" placeholder="Cari nama pekerjaan…">
         </div>
       </div>
       <div class="table-wrap" style="margin-top:12px;">
@@ -204,15 +244,24 @@
         </div>
       </div>
 
-    </div><!-- /bottom-row -->
+    </div>
 
   </div><!-- /page-body -->
 
-  <footer>Data ditarik dari Google Sheets · Sinkron otomatis tiap 5 menit</footer>
+  <!-- ── MODAL DETAIL ── -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <span class="modal-title" id="modalTitle">Detail Pekerjaan</span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <footer>Data ditarik dari Google Sheets · Sinkron otomatis tiap 5 menit · RSUP Fatmawati</footer>
 
 </div><!-- /wrap -->
-
-<!-- JavaScript utama (letakkan setelah semua elemen HTML) -->
 <script src="app.js"></script>
 </body>
 </html>
