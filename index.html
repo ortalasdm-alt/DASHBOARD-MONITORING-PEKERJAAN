@@ -1,254 +1,230 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Monitoring Pekerjaan</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Monitoring Pekerjaan — OSDM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-  <!-- ── HEADER ── -->
-  <header>
-    <div class="head-left">
-      <!-- Logo RSUP Fatmawati (SVG inline) -->
-      <div class="head-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="44" height="44">
-          <!-- Daun kiri bawah (hijau teal) -->
-          <ellipse cx="22" cy="52" rx="18" ry="10" fill="#00b4a6" transform="rotate(-40 22 52)"/>
-          <!-- Daun kanan bawah (kuning-hijau) -->
-          <ellipse cx="58" cy="52" rx="18" ry="10" fill="#c8d400" transform="rotate(40 58 52)"/>
-          <!-- Daun kiri atas (biru teal) -->
-          <ellipse cx="22" cy="28" rx="18" ry="10" fill="#00b4a6" transform="rotate(40 22 28)"/>
-          <!-- Daun kanan atas (hijau teal lebih muda) -->
-          <ellipse cx="58" cy="28" rx="18" ry="10" fill="#00cfc0" transform="rotate(-40 58 28)"/>
-          <!-- Lingkaran tengah merah -->
-          <circle cx="40" cy="40" r="9" fill="#e8003d"/>
-          <!-- Anak panah putih ke kiri -->
-          <polygon points="44,40 38,35 38,45" fill="white"/>
+  <!-- ══════════════ SIDEBAR ══════════════ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 80 80" width="32" height="32">
+          <path d="M40 4 L72 16 V40 C72 60 56 72 40 76 C24 72 8 60 8 40 V16 Z" fill="#d4af37"/>
+          <path d="M40 10 L66 20 V40 C66 56 53 66 40 70 C27 66 14 56 14 40 V20 Z" fill="#0a3d62"/>
+          <circle cx="40" cy="38" r="14" fill="#d4af37"/>
         </svg>
       </div>
-      <div>
-        <div class="head-title">Dashboard Monitoring Pekerjaan</div>
-        <div class="head-sub">RSUP Fatmawati — Instalasi Pengelolaan Inovasi dan Kekayaan Intelektual</div>
-      </div>
-    </div>
-    <div class="head-right">
-      <div class="date-box">
-        <span>📅</span>
-        <span id="syncStatus">Memuat data…</span>
-      </div>
-      <button class="refresh-btn" id="refreshBtn" title="Refresh">
-        <span class="spin">⟳</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- ── FILTER BAR ── -->
-  <div class="filter-bar">
-    <div class="filter-group">
-      <span class="filter-icon">📅</span>
-      <div class="filter-label">Triwulan</div>
-      <select id="filterTriwulan" class="filter-select">
-        <option value="">Semua</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <span class="filter-icon">🗓</span>
-      <div class="filter-label">Bulan</div>
-      <select id="filterBulan" class="filter-select">
-        <option value="">Semua</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <span class="filter-icon">📆</span>
-      <div class="filter-label">Minggu Ke</div>
-      <select id="filterMinggu" class="filter-select">
-        <option value="">Semua</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <span class="filter-icon">▼</span>
-      <div class="filter-label">Status</div>
-      <select id="filterStatus" class="filter-select">
-        <option value="">Semua</option>
-        <option value="Selesai">Selesai</option>
-        <option value="Berjalan">Proses</option>
-        <option value="Terlambat">Terlambat</option>
-        <option value="Belum Mulai">Belum Mulai</option>
-      </select>
-    </div>
-    <button class="filter-reset" id="resetFilter" title="Reset semua filter">✕ Reset</button>
-  </div>
-
-  <!-- ── BANNER NOTIFIKASI ── -->
-  <div class="banner loading" id="loadingBanner">⟳ Mengambil data terbaru dari Google Sheets…</div>
-  <div class="banner error"   id="errorBanner">
-    ⚠️ <span id="errorMsg">Gagal memuat data.</span>
-    <button id="retryBtn">Coba lagi</button>
-  </div>
-
-  <div class="page-body">
-
-    <!-- ── KPI CARDS ── -->
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-icon blue">📋</div>
-        <div class="kpi-body">
-          <div class="kpi-label">Total Pekerjaan</div>
-          <div class="kpi-value blue" id="kpiTotal">0</div>
-          <div class="kpi-sub">Semua Pekerjaan</div>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon green">✔</div>
-        <div class="kpi-body">
-          <div class="kpi-label">Selesai</div>
-          <div class="kpi-value green" id="kpiSelesai">0</div>
-          <div class="kpi-sub" id="kpiSelesaiPct">0% dari total</div>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon amber">🕐</div>
-        <div class="kpi-body">
-          <div class="kpi-label">Proses</div>
-          <div class="kpi-value amber" id="kpiBerjalan">0</div>
-          <div class="kpi-sub" id="kpiBerjalanPct">0% dari total</div>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-icon red">⚠</div>
-        <div class="kpi-body">
-          <div class="kpi-label">Terlambat</div>
-          <div class="kpi-value red" id="kpiBelum">0</div>
-          <div class="kpi-sub" id="kpiBelumPct">0% dari total</div>
-        </div>
+      <div class="brand-text">
+        <div class="brand-title">OSDM</div>
+        <div class="brand-sub">Tim Kerja</div>
       </div>
     </div>
 
-    <!-- ── PROGRESS + STATUS DONUT ── -->
-    <div class="mid-row">
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">PROGRESS PEKERJAAN</span>
-          <select class="select-sm" id="progFilter">
-            <option value="50">Top 50 Pekerjaan</option>
-            <option value="20">Top 20 Pekerjaan</option>
-            <option value="10">Top 10 Pekerjaan</option>
-            <option value="999">Semua</option>
-          </select>
+    <nav class="nav">
+      <a href="#" class="nav-item active" data-tab="dashboard"><span class="nav-ico">▦</span>Dashboard</a>
+      <a href="#" class="nav-item" data-tab="pekerjaan"><span class="nav-ico">📋</span>Pekerjaan</a>
+      <a href="#" class="nav-item" data-tab="kalender"><span class="nav-ico">📅</span>Kalender</a>
+      <a href="#" class="nav-item" data-tab="laporan"><span class="nav-ico">📄</span>Laporan</a>
+      <a href="#" class="nav-item" data-tab="timkerja"><span class="nav-ico">👥</span>Tim Kerja</a>
+      <a href="#" class="nav-item" data-tab="dokumen"><span class="nav-ico">🗂</span>Dokumen</a>
+      <a href="#" class="nav-item" data-tab="notifikasi"><span class="nav-ico">🔔</span>Notifikasi</a>
+      <a href="#" class="nav-item" data-tab="pengaturan"><span class="nav-ico">⚙</span>Pengaturan</a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="team-card">
+        <div class="team-card-title">Tim Kerja OSDM</div>
+        <div class="team-card-sub">Bekerja Bersama<br>Mewujudkan Kinerja Terbaik</div>
+      </div>
+      <div class="user-card">
+        <div class="user-avatar">AP</div>
+        <div class="user-info">
+          <div class="user-name" id="userName">Andi Pratama</div>
+          <div class="user-role" id="userRole">Project Manager</div>
         </div>
-        <div class="panel-body">
-          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">
-            <span>Nama Pekerjaan</span>
-            <span>Progress (%)</span>
+        <span class="user-caret">⌄</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════ MAIN ══════════════ -->
+  <main class="main">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1>Dashboard Monitoring Pekerjaan</h1>
+        <p>Tim Kerja OSDM</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" title="Notifikasi">
+          🔔<span class="icon-badge" id="notifBadge">0</span>
+        </button>
+        <div class="date-pill">
+          <span class="cal-ico">📅</span>
+          <div>
+            <div class="date-pill-main" id="dateMain">—</div>
+            <div class="date-pill-sub" id="dateSub">—</div>
           </div>
-          <div class="prog-list" id="progList" style="max-height:280px;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BANNERS -->
+    <div class="banner loading" id="loadingBanner">⟳ Mengambil data terbaru dari Google Sheets…</div>
+    <div class="banner error" id="errorBanner">
+      ⚠️ <span id="errorMsg">Gagal memuat data.</span>
+      <button id="retryBtn">Coba lagi</button>
+    </div>
+
+    <!-- FILTER ROW -->
+    <div class="filter-row">
+      <div class="field">
+        <label>Triwulan</label>
+        <select id="filterTriwulan"><option value="">Semua Triwulan</option></select>
+      </div>
+      <div class="field">
+        <label>Bulan</label>
+        <select id="filterBulan"><option value="">Semua Bulan</option></select>
+      </div>
+      <div class="field">
+        <label>Minggu</label>
+        <select id="filterMinggu"><option value="">Semua Minggu</option></select>
+      </div>
+      <div class="field">
+        <label>PIC</label>
+        <select id="filterPic"><option value="">Semua PIC</option></select>
+      </div>
+      <div class="search-field">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Cari pekerjaan...">
+      </div>
+      <button class="btn-refresh" id="refreshBtn"><span class="spin">⟳</span> Refresh Data</button>
+    </div>
+
+    <div class="body-grid">
+
+      <!-- KPI CARDS -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-icon blue">📋</div>
+          <div class="kpi-text">
+            <div class="kpi-label">Total Pekerjaan</div>
+            <div class="kpi-value" id="kpiTotal">0</div>
+            <div class="kpi-sub">Semua status</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon amber">🕐</div>
+          <div class="kpi-text">
+            <div class="kpi-label">Progress</div>
+            <div class="kpi-value" id="kpiProgress">0</div>
+            <div class="kpi-sub" id="kpiProgressPct">0% dari total</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon green">✔</div>
+          <div class="kpi-text">
+            <div class="kpi-label">Selesai</div>
+            <div class="kpi-value" id="kpiSelesai">0</div>
+            <div class="kpi-sub" id="kpiSelesaiPct">0% dari total</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon red">⏱</div>
+          <div class="kpi-text">
+            <div class="kpi-label">Terlambat</div>
+            <div class="kpi-value" id="kpiTerlambat">0</div>
+            <div class="kpi-sub" id="kpiTerlambatPct">0% dari total</div>
+          </div>
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">STATUS PEKERJAAN</span>
+      <!-- CHARTS ROW -->
+      <div class="charts-row">
+        <div class="panel donut-panel">
+          <div class="panel-head"><span>Grafik Status Pekerjaan</span></div>
+          <div class="panel-body donut-body">
+            <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
+            <div class="legend-list" id="legendList"></div>
+          </div>
         </div>
-        <div class="panel-body">
-          <div class="status-wrap">
-            <div class="donut-container">
-              <canvas id="donutChart"></canvas>
-            </div>
-            <table class="status-table">
-              <tbody>
+
+        <div class="panel bar-panel">
+          <div class="panel-head">
+            <span>Grafik Pekerjaan per Bulan (Tahun <span id="barYear">2026</span>)</span>
+            <select id="yearFilter" class="select-sm"></select>
+          </div>
+          <div class="panel-body">
+            <canvas id="barChart" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="panel pic-panel">
+          <div class="panel-head"><span>Ringkasan Pekerjaan per PIC</span></div>
+          <div class="panel-body">
+            <div class="pic-head-row"><span>PIC</span><span>Jumlah</span></div>
+            <div id="picList" class="pic-list"></div>
+            <a href="#" class="link-more" id="seeAllPic">Lihat semua PIC →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLE + SIDE PANELS -->
+      <div class="lower-row">
+        <div class="panel table-panel">
+          <div class="panel-head"><span>Daftar Pekerjaan</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <td><div class="row-label"><span class="dot" style="background:#16a34a"></span>Selesai</div></td>
-                  <td class="row-num" id="stSelesai">0</td>
-                  <td class="row-pct" id="stSelesaiPct">0%</td>
+                  <th>No</th><th>Tanggal</th><th>Pekerjaan</th><th>PIC</th>
+                  <th>Prioritas</th><th>Status</th><th>Progress</th><th>Deadline</th>
                 </tr>
-                <tr>
-                  <td><div class="row-label"><span class="dot" style="background:#f59e0b"></span>Proses</div></td>
-                  <td class="row-num" id="stBerjalan">0</td>
-                  <td class="row-pct" id="stBerjalanPct">0%</td>
-                </tr>
-                <tr>
-                  <td><div class="row-label"><span class="dot" style="background:#ef4444"></span>Terlambat</div></td>
-                  <td class="row-num" id="stBelum">0</td>
-                  <td class="row-pct" id="stBelumPct">0%</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td style="font-weight:700;">Total</td>
-                  <td class="row-num" id="stTotal">0</td>
-                  <td class="row-pct">100%</td>
-                </tr>
-              </tfoot>
+              </thead>
+              <tbody id="mainTableBody"></tbody>
             </table>
           </div>
+          <div class="table-footer">
+            <span class="info" id="pageInfo">Menampilkan 0 dari 0 data</span>
+            <a href="#" class="link-more" id="seeAllTasks">Lihat semua pekerjaan →</a>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <!-- ── SEARCH + TABEL PEKERJAAN ── -->
-    <div class="panel">
-      <div class="panel-body" style="padding-bottom:0;">
-        <div class="search-bar">
-          <span>🔍</span>
-          <input type="text" id="searchInput" placeholder="Cari nama pekerjaan…">
-        </div>
-      </div>
-      <div class="table-wrap" style="margin-top:12px;">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:44px;">No</th>
-              <th>Nama Pekerjaan</th>
-              <th style="width:110px;">Status</th>
-              <th style="width:80px;">Progress</th>
-              <th style="width:200px;"></th>
-              <th style="width:120px;">Target</th>
-              <th style="width:110px;">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="mainTableBody"></tbody>
-        </table>
-      </div>
-      <div class="pagination">
-        <span class="info" id="pageInfo">Menampilkan 0 dari 0 pekerjaan</span>
-        <button class="pg-btn" id="prevPage" disabled>‹</button>
-        <div id="pgNumbers" style="display:flex;gap:4px;"></div>
-        <button class="pg-btn" id="nextPage" disabled>›</button>
-      </div>
-    </div>
-
-    <!-- ── KENDALA & TINDAK LANJUT ── -->
-    <div class="bottom-row">
-
-      <div class="accordion">
-        <div class="acc-head open" id="kendalaHead" onclick="toggleAcc('kendala')">
-          <span>DAFTAR KENDALA</span>
-          <span class="chevron">▼</span>
-        </div>
-        <div class="acc-body" id="kendalaBody">
-          <div id="kendalaList"></div>
+        <div class="side-panels">
+          <div class="panel mendesak-panel">
+            <div class="panel-head red"><span>⚠ Pekerjaan Mendesak</span></div>
+            <div class="panel-body" id="mendesakList"></div>
+            <div class="table-footer"><a href="#" class="link-more" id="seeAllMendesak">Lihat semua →</a></div>
+          </div>
         </div>
       </div>
 
-      <div class="accordion">
-        <div class="acc-head open" id="tindakHead" onclick="toggleAcc('tindak')">
-          <span>TINDAK LANJUT</span>
-          <span class="chevron">▼</span>
+      <div class="bottom-row">
+        <div class="panel">
+          <div class="panel-head"><span>Aktivitas Terbaru</span></div>
+          <div class="panel-body" id="aktivitasList"></div>
+          <div class="table-footer"><a href="#" class="link-more">Lihat semua aktivitas →</a></div>
         </div>
-        <div class="acc-body" id="tindakBody">
-          <div id="tindakList"></div>
+        <div class="panel">
+          <div class="panel-head"><span>Deadline Mendatang</span></div>
+          <div class="panel-body" id="deadlineList"></div>
+          <div class="table-footer"><a href="#" class="link-more">Lihat kalender →</a></div>
         </div>
       </div>
 
-    </div>
+    </div><!-- /body-grid -->
 
-  </div><!-- /page-body -->
+    <footer>Data ditarik dari Google Sheets · Sinkron otomatis tiap 5 menit · OSDM</footer>
+  </main>
 
-  <!-- ── MODAL DETAIL ── -->
+  <!-- ══════════════ MODAL ══════════════ -->
   <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
       <div class="modal-head">
@@ -259,9 +235,7 @@
     </div>
   </div>
 
-  <footer>Data ditarik dari Google Sheets · Sinkron otomatis tiap 5 menit · RSUP Fatmawati</footer>
-
-</div><!-- /wrap -->
+</div><!-- /app -->
 <script src="app.js"></script>
 </body>
 </html>

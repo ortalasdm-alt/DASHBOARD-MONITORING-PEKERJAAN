@@ -1,40 +1,46 @@
 /* ============================================================
-   Dashboard Monitoring Pekerjaan — app.js
-   RSUP Fatmawati
+   Dashboard Monitoring Pekerjaan — OSDM
+   app.js — terhubung ke Google Sheets
    ============================================================ */
 
-/* ── KONFIGURASI ──────────────────────────────────────────── */
-const SHEET_ID        = "1BLZmMk9v5d7uXZlTn35vMvfQM7AZ5rpUwFXI35tVG58";
-const GID             = "0";
+/* ── KONFIGURASI GOOGLE SHEETS ───────────────────────────────
+   1. Buka Google Sheet kamu → klik "Share" → ubah ke
+      "Anyone with the link" (Viewer) supaya bisa dibaca publik.
+   2. Salin ID Sheet dari URL:
+      https://docs.google.com/spreadsheets/d/  >>ID<<  /edit
+   3. Tempel ID itu ke SHEET_ID di bawah ini.
+   4. GID adalah angka di akhir URL setelah "gid=" (lihat tab sheet).
+   5. Pastikan baris pertama sheet berisi header yang namanya
+      SAMA seperti di kolom kiri COLUMN_MAP berikut (boleh ubah
+      urutan kolom, tapi nama header harus sama persis).
+   ──────────────────────────────────────────────────────────── */
+const SHEET_ID        = "1NLLG-XKkXvctZA-fs1xhqymGOv5n9TFsdMhiT9S7EsE";
+const GID             = "0"; // sheet "Pekerjaan" — ganti jika gid tab kamu berbeda
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 const COLUMN_MAP = {
-  "ID"                        : "id",
-  "Triwulan"                  : "triwulan",
-  "Bulan"                     : "bulan",
-  "Minggu ke"                 : "minggu",
-  "Nama Kegiatan/Pekerjaan"   : "pekerjaan",
-  "Progres (%)"               : "progres",
-  "Status"                    : "status",
-  "Kendala"                   : "kendala",
-  "Tindak Lanjut"             : "tindak",
-  "Tanggal Update"            : "tanggal",
-  "Target"                    : "target"
+  "ID"                      : "id",
+  "Tanggal"                 : "tanggal",
+  "Triwulan"                : "triwulan",
+  "Bulan"                   : "bulan",
+  "Minggu ke"               : "minggu",
+  "Nama Kegiatan/Pekerjaan" : "pekerjaan",
+  "PIC"                     : "pic",
+  "Prioritas"               : "prioritas",
+  "Progres (%)"             : "progres",
+  "Status"                  : "status",
+  "Deadline"                : "deadline",
+  "Kendala"                 : "kendala",
+  "Tindak Lanjut"           : "tindak"
 };
 
-const statusColor = {
-  "Belum Mulai" : "#ef4444",
-  "Berjalan"    : "#f59e0b",
-  "Selesai"     : "#16a34a",
-  "Terlambat"   : "#ef4444"
-};
+// Status yang dikenal sistem (sesuaikan jika nama status di sheet berbeda)
+const STATUS_LIST   = ["Selesai", "In Progress", "Review", "Terlambat"];
+const statusColor    = { "Selesai": "#16a34a", "In Progress": "#2563eb", "Review": "#f59e0b", "Terlambat": "#ef4444" };
+const statusBadgeCls = { "Selesai": "selesai", "In Progress": "progress", "Review": "review", "Terlambat": "terlambat" };
+const prioCls         = { "Tinggi": "tinggi", "Sedang": "sedang", "Rendah": "rendah" };
 
-const statusBadge = {
-  "Belum Mulai" : "belum",
-  "Berjalan"    : "berjalan",
-  "Selesai"     : "selesai",
-  "Terlambat"   : "belum"
-};
+const MONTHS_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
 /* ── STATE ────────────────────────────────────────────────── */
 let RAW_DATA    = [];
@@ -42,20 +48,13 @@ let filtered    = [];
 let currentPage = 1;
 const PAGE_SIZE = 5;
 let donutChart  = null;
+let barChart    = null;
 
-/* ── ACCORDION ────────────────────────────────────────────── */
-function toggleAcc(id) {
-  const head = document.getElementById(id + "Head");
-  const body = document.getElementById(id + "Body");
-  const open = head.classList.toggle("open");
-  body.style.display = open ? "block" : "none";
-}
-
-/* ── FETCH DATA DARI GOOGLE SHEETS ───────────────────────── */
+/* ── FETCH DATA DARI GOOGLE SHEETS (via GViz JSONP) ──────── */
 function loadSheetData() {
   return new Promise((resolve, reject) => {
     const cb    = "gsCallback_" + Date.now();
-    const timer = setTimeout(() => { cleanup(); reject(new Error("Timeout: koneksi habis waktu.")); }, 15000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error("Timeout: koneksi ke Google Sheets habis waktu.")); }, 15000);
 
     function cleanup() {
       delete window[cb];
@@ -82,9 +81,9 @@ function loadSheetData() {
       } catch (e) { reject(e); }
     };
 
-    const sc  = document.createElement("script");
-    sc.src    = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&headers=1&tqx=responseHandler:${cb}`;
-    sc.onerror = () => { cleanup(); reject(new Error("Gagal menghubungi Google Sheets. Cek koneksi dan SHEET_ID.")); };
+    const sc   = document.createElement("script");
+    sc.src     = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&headers=1&tqx=responseHandler:${cb}`;
+    sc.onerror = () => { cleanup(); reject(new Error("Gagal menghubungi Google Sheets. Cek koneksi internet dan SHEET_ID.")); };
     document.body.appendChild(sc);
   });
 }
@@ -105,33 +104,56 @@ function rowsToData(headers, rows) {
     let progres = parseFloat(String(get("progres")).replace("%", "").replace(",", "."));
     if (isNaN(progres)) progres = 0;
 
-    let status = get("status") || (progres >= 100 ? "Selesai" : progres > 0 ? "Berjalan" : "Belum Mulai");
-    if (!statusColor[status]) status = progres >= 100 ? "Selesai" : progres > 0 ? "Berjalan" : "Belum Mulai";
+    let status = get("status");
+    if (!STATUS_LIST.includes(status)) {
+      status = progres >= 100 ? "Selesai" : progres > 0 ? "In Progress" : "Review";
+    }
+
+    let prioritas = get("prioritas");
+    if (!prioCls[prioritas]) prioritas = "Sedang";
 
     return {
       id        : get("id"),
+      tanggal   : get("tanggal"),
       triwulan  : get("triwulan"),
       bulan     : get("bulan"),
       minggu    : get("minggu"),
       pekerjaan,
+      pic       : get("pic") || "Belum ditentukan",
+      prioritas,
       progres   : Math.max(0, Math.min(100, progres)),
       status,
+      deadline  : get("deadline"),
       kendala   : get("kendala"),
-      tindak    : get("tindak"),
-      tanggal   : get("tanggal"),
-      target    : get("target")
+      tindak    : get("tindak")
     };
   }).filter(Boolean);
+}
+
+/* ── PARSE TANGGAL (dukung dd/mm/yyyy, Date(...), atau teks bebas) ── */
+function parseDate(str) {
+  if (!str) return null;
+  // Format Google Visualization: Date(2026,5,30)
+  const m = String(str).match(/Date\((\d+),(\d+),(\d+)\)/);
+  if (m) return new Date(+m[1], +m[2], +m[3]);
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDateShort(str) {
+  const d = parseDate(str);
+  if (!d) return str || "-";
+  return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 /* ── POPULATE FILTER DROPDOWNS ───────────────────────────── */
 function populateFilters() {
   const unique = (field) => [...new Set(RAW_DATA.map(d => d[field]).filter(v => v && v.trim()))].sort();
 
-  const fill = (id, values) => {
+  const fill = (id, values, placeholder) => {
     const sel = document.getElementById(id);
     const cur = sel.value;
-    sel.innerHTML = '<option value="">Semua</option>';
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
     values.forEach(v => {
       const opt = document.createElement("option");
       opt.value = v;
@@ -141,10 +163,20 @@ function populateFilters() {
     });
   };
 
-  fill("filterTriwulan", unique("triwulan"));
-  fill("filterBulan",    unique("bulan"));
-  fill("filterMinggu",   unique("minggu"));
-  // Status sudah didefinisikan statis di HTML
+  fill("filterTriwulan", unique("triwulan"), "Semua Triwulan");
+  fill("filterBulan",    unique("bulan"),    "Semua Bulan");
+  fill("filterMinggu",   unique("minggu"),   "Semua Minggu");
+  fill("filterPic",      unique("pic"),      "Semua PIC");
+
+  // Filter tahun untuk grafik bar
+  const years = [...new Set(RAW_DATA.map(d => {
+    const dt = parseDate(d.tanggal) || parseDate(d.deadline);
+    return dt ? dt.getFullYear() : null;
+  }).filter(Boolean))].sort();
+  const yearSel = document.getElementById("yearFilter");
+  const curY = yearSel.value;
+  yearSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("") || `<option value="${new Date().getFullYear()}">${new Date().getFullYear()}</option>`;
+  if (years.includes(+curY)) yearSel.value = curY;
 }
 
 /* ── APPLY FILTERS ────────────────────────────────────────── */
@@ -152,27 +184,16 @@ function applyFilters() {
   const tw  = document.getElementById("filterTriwulan").value;
   const bln = document.getElementById("filterBulan").value;
   const mg  = document.getElementById("filterMinggu").value;
-  const st  = document.getElementById("filterStatus").value;
+  const pic = document.getElementById("filterPic").value;
 
   filtered = RAW_DATA.filter(d => {
     if (tw  && d.triwulan !== tw)  return false;
     if (bln && d.bulan    !== bln) return false;
     if (mg  && d.minggu   !== mg)  return false;
-    if (st  && d.status   !== st)  return false;
+    if (pic && d.pic      !== pic) return false;
     return true;
   });
 
-  currentPage = 1;
-  renderAll();
-}
-
-/* ── RESET FILTER ─────────────────────────────────────────── */
-function resetFilter() {
-  ["filterTriwulan","filterBulan","filterMinggu","filterStatus"].forEach(id => {
-    document.getElementById(id).value = "";
-  });
-  document.getElementById("searchInput").value = "";
-  filtered = [...RAW_DATA];
   currentPage = 1;
   renderAll();
 }
@@ -187,15 +208,13 @@ function setLoading(v) {
 function setError(msg) {
   document.getElementById("errorBanner").classList.add("show");
   document.getElementById("errorMsg").textContent = msg;
-  document.getElementById("syncStatus").textContent = "Gagal sinkron";
 }
 
 function setSynced() {
   document.getElementById("errorBanner").classList.remove("show");
   const now = new Date();
-  const tgl = now.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
-  const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-  document.getElementById("syncStatus").textContent = `Update Terakhir : ${tgl} ${jam} WIB`;
+  document.getElementById("dateMain").textContent = now.toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  document.getElementById("dateSub").textContent   = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
 }
 
 /* ── REFRESH / MAIN ENTRY POINT ──────────────────────────── */
@@ -204,7 +223,7 @@ async function refresh() {
   try {
     const { headers, rows } = await loadSheetData();
     const data = rowsToData(headers, rows);
-    if (!data.length) throw new Error("Tidak ada data terbaca. Periksa nama kolom header sheet.");
+    if (!data.length) throw new Error("Tidak ada data terbaca. Periksa nama kolom header di sheet sesuai COLUMN_MAP.");
     RAW_DATA    = data;
     filtered    = [...data];
     currentPage = 1;
@@ -212,205 +231,209 @@ async function refresh() {
     renderAll();
     setSynced();
   } catch (e) {
-    console.error(e);
-    setError(e.message || "Terjadi kesalahan saat mengambil data.");
+    setError(e.message || "Terjadi kesalahan saat memuat data.");
   } finally {
     setLoading(false);
   }
 }
 
-/* ── RENDER SEMUA SECTION ────────────────────────────────── */
+/* ── RENDER SEMUA KOMPONEN ───────────────────────────────── */
 function renderAll() {
-  renderKPIs();
+  renderKpi();
   renderDonut();
-  renderProg();
+  renderBar();
+  renderPicSummary();
   renderTable();
-  renderKendala();
-  renderTindak();
+  renderMendesak();
+  renderAktivitas();
+  renderDeadline();
 }
 
-function pct(n, total) {
-  return total ? ((n / total) * 100).toFixed(0) : 0;
+/* ── KPI CARDS ────────────────────────────────────────────── */
+function pct(n, total) { return total ? Math.round((n / total) * 1000) / 10 : 0; }
+
+function renderKpi() {
+  const total     = filtered.length;
+  const selesai   = filtered.filter(d => d.status === "Selesai").length;
+  const progress  = filtered.filter(d => d.status === "In Progress").length;
+  const terlambat = filtered.filter(d => d.status === "Terlambat").length;
+
+  document.getElementById("kpiTotal").textContent     = total;
+  document.getElementById("kpiProgress").textContent  = progress;
+  document.getElementById("kpiSelesai").textContent   = selesai;
+  document.getElementById("kpiTerlambat").textContent = terlambat;
+
+  document.getElementById("kpiProgressPct").textContent  = `${pct(progress, total)}% dari total`;
+  document.getElementById("kpiSelesaiPct").textContent    = `${pct(selesai, total)}% dari total`;
+  document.getElementById("kpiTerlambatPct").textContent  = `${pct(terlambat, total)}% dari total`;
+
+  document.getElementById("notifBadge").textContent = terlambat;
 }
 
-/* ── KPI CARDS ───────────────────────────────────────────── */
-function renderKPIs() {
-  const total    = filtered.length;
-  const selesai  = filtered.filter(d => d.status === "Selesai").length;
-  const berjalan = filtered.filter(d => d.status === "Berjalan").length;
-  const belum    = filtered.filter(d => d.status === "Belum Mulai" || d.status === "Terlambat").length;
-
-  document.getElementById("kpiTotal").textContent       = total;
-  document.getElementById("kpiSelesai").textContent     = selesai;
-  document.getElementById("kpiBerjalan").textContent    = berjalan;
-  document.getElementById("kpiBelum").textContent       = belum;
-  document.getElementById("kpiSelesaiPct").textContent  = pct(selesai,  total) + "% dari total";
-  document.getElementById("kpiBerjalanPct").textContent = pct(berjalan, total) + "% dari total";
-  document.getElementById("kpiBelumPct").textContent    = pct(belum,    total) + "% dari total";
-}
-
-/* ── DONUT CHART & STATUS TABLE ──────────────────────────── */
+/* ── DONUT: STATUS PEKERJAAN ─────────────────────────────── */
 function renderDonut() {
-  const selesai  = filtered.filter(d => d.status === "Selesai").length;
-  const berjalan = filtered.filter(d => d.status === "Berjalan").length;
-  const belum    = filtered.filter(d => d.status === "Belum Mulai" || d.status === "Terlambat").length;
-  const total    = filtered.length || 1;
-
-  document.getElementById("stSelesai").textContent     = selesai;
-  document.getElementById("stBerjalan").textContent    = berjalan;
-  document.getElementById("stBelum").textContent       = belum;
-  document.getElementById("stTotal").textContent       = filtered.length;
-  document.getElementById("stSelesaiPct").textContent  = pct(selesai,  total) + "%";
-  document.getElementById("stBerjalanPct").textContent = pct(berjalan, total) + "%";
-  document.getElementById("stBelumPct").textContent    = pct(belum,    total) + "%";
+  const counts = STATUS_LIST.map(s => filtered.filter(d => d.status === s).length);
+  const total  = filtered.length;
+  const ctx    = document.getElementById("donutChart").getContext("2d");
 
   if (donutChart) donutChart.destroy();
-  donutChart = new Chart(document.getElementById("donutChart"), {
+  donutChart = new Chart(ctx, {
     type: "doughnut",
     data: {
-      labels: ["Selesai", "Proses", "Terlambat"],
-      datasets: [{
-        data: [selesai, berjalan, belum],
-        backgroundColor: ["#16a34a", "#f59e0b", "#ef4444"],
-        borderWidth: 3,
-        borderColor: "#fff"
-      }]
+      labels: STATUS_LIST,
+      datasets: [{ data: counts, backgroundColor: STATUS_LIST.map(s => statusColor[s]), borderWidth: 0 }]
     },
     options: {
-      cutout: "65%",
+      cutout: "68%",
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: c => `${c.label}: ${c.parsed} (${pct(c.parsed, total)}%)`
-          }
-        }
+        tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed} (${pct(c.parsed, total)}%)` } }
       }
+    }
+  });
+
+  document.getElementById("legendList").innerHTML = STATUS_LIST.map((s, i) => `
+    <div class="legend-row">
+      <span class="lbl"><span class="dot" style="background:${statusColor[s]}"></span>${s}</span>
+      <span class="val">${pct(counts[i], total)}% (${counts[i]})</span>
+    </div>`).join("");
+}
+
+/* ── BAR CHART: PEKERJAAN PER BULAN ──────────────────────── */
+function renderBar() {
+  const year = +document.getElementById("yearFilter").value || new Date().getFullYear();
+  document.getElementById("barYear").textContent = year;
+
+  const counts = new Array(12).fill(0);
+  RAW_DATA.forEach(d => {
+    const dt = parseDate(d.tanggal) || parseDate(d.deadline);
+    if (dt && dt.getFullYear() === year) counts[dt.getMonth()]++;
+  });
+
+  const ctx = document.getElementById("barChart").getContext("2d");
+  if (barChart) barChart.destroy();
+  barChart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: MONTHS_ID, datasets: [{ data: counts, backgroundColor: "#2563eb", borderRadius: 5, maxBarThickness: 30 }] },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.y} Pekerjaan` } } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 25 } }, x: { grid: { display: false } } }
     }
   });
 }
 
-/* ── PROGRESS BAR LIST (tanpa garis biru — warna sesuai status) ── */
-function renderProg() {
-  const limit  = parseInt(document.getElementById("progFilter").value) || 50;
-  const sorted = [...filtered].sort((a, b) => b.progres - a.progres).slice(0, limit);
-
-  document.getElementById("progList").innerHTML = sorted.map(d => {
-    const color = statusColor[d.status] || "#64748b";
-    return `
-    <div>
-      <div class="prog-item">
-        <span class="prog-name" title="${esc(d.pekerjaan)}">${esc(d.pekerjaan)}</span>
-        <span class="prog-pct">${d.progres}%</span>
-      </div>
-      <div class="prog-track">
-        <div class="prog-fill" style="width:${d.progres}%;background:${color}"></div>
-      </div>
-    </div>`;
-  }).join("");
+/* ── RINGKASAN PER PIC ────────────────────────────────────── */
+function initials(name) {
+  return name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
-/* ── TABEL PEKERJAAN (search mencakup semua filtered) ────── */
+function renderPicSummary() {
+  const map = {};
+  filtered.forEach(d => { map[d.pic] = (map[d.pic] || 0) + 1; });
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  document.getElementById("picList").innerHTML = sorted.map(([name, count]) => `
+    <div class="pic-row">
+      <span class="pic-avatar">${esc(initials(name))}</span>
+      <span class="pic-name">${esc(name)}</span>
+      <span class="pic-count">${count}</span>
+    </div>`).join("") || '<div style="color:var(--muted);font-size:12.5px;">Belum ada data PIC.</div>';
+}
+
+/* ── TABEL PEKERJAAN ──────────────────────────────────────── */
 function renderTable() {
   const q   = document.getElementById("searchInput").value.toLowerCase().trim();
-  // FIX #6: search dilakukan pada seluruh filtered, bukan hanya halaman aktif
-  const src = q
-    ? filtered.filter(d => d.pekerjaan.toLowerCase().includes(q))
-    : filtered;
+  const src = q ? filtered.filter(d => d.pekerjaan.toLowerCase().includes(q) || d.pic.toLowerCase().includes(q)) : filtered;
 
   const totalPages = Math.max(1, Math.ceil(src.length / PAGE_SIZE));
   if (currentPage > totalPages) currentPage = 1;
-
   const start = (currentPage - 1) * PAGE_SIZE;
   const page  = src.slice(start, start + PAGE_SIZE);
 
   document.getElementById("mainTableBody").innerHTML = page.map((d, i) => {
-    const labelStatus = d.status === "Berjalan" ? "Proses"
-                      : d.status === "Belum Mulai" ? "Terlambat"
-                      : d.status;
+    const isLate = d.status === "Terlambat";
     return `
     <tr>
       <td style="color:var(--muted);text-align:center;">${start + i + 1}</td>
+      <td style="white-space:nowrap;">${esc(fmtDateShort(d.tanggal))}</td>
       <td>${esc(d.pekerjaan)}</td>
-      <td><span class="badge ${statusBadge[d.status] || 'belum'}">${esc(labelStatus)}</span></td>
+      <td><div class="pic-cell"><span class="pic-avatar">${esc(initials(d.pic))}</span>${esc(d.pic)}</div></td>
+      <td><span class="prio ${prioCls[d.prioritas] || 'sedang'}">${esc(d.prioritas)}</span></td>
+      <td><span class="badge ${statusBadgeCls[d.status] || 'review'}">${esc(d.status)}</span></td>
       <td>
         <div class="prog-cell">
-          <span style="font-weight:700;font-size:12px;min-width:34px;">${d.progres}%</span>
+          <div class="track"><div class="fill" style="width:${d.progres}%;background:${statusColor[d.status] || '#64748b'}"></div></div>
+          <span class="pct">${d.progres}%</span>
         </div>
       </td>
-      <td>
-        <div class="prog-cell">
-          <div class="track">
-            <div class="fill" style="width:${d.progres}%;background:${statusColor[d.status] || '#64748b'}"></div>
-          </div>
-        </div>
-      </td>
-      <td style="font-size:12px;color:var(--muted);">${esc(d.target || d.tanggal || "-")}</td>
-      <td>
-        <!-- FIX #5: tombol Detail berfungsi membuka modal -->
-        <button class="btn-detail" onclick="openModal(${RAW_DATA.indexOf(d)})">Detail ▼</button>
-      </td>
+      <td><span class="deadline-cell ${isLate ? 'late' : ''}">${esc(fmtDateShort(d.deadline))}</span></td>
     </tr>`;
-  }).join("");
+  }).join("") || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">Tidak ada data.</td></tr>`;
 
-  const end = Math.min(start + PAGE_SIZE, src.length);
   document.getElementById("pageInfo").textContent =
-    `Menampilkan ${src.length ? start + 1 : 0} – ${end} dari ${src.length} pekerjaan`;
-
-  document.getElementById("prevPage").disabled = currentPage <= 1;
-  document.getElementById("nextPage").disabled = currentPage >= totalPages;
-
-  buildPagination(totalPages, src);
+    `Menampilkan ${src.length ? start + 1 : 0} – ${Math.min(start + PAGE_SIZE, src.length)} dari ${src.length} data`;
 }
 
-function buildPagination(totalPages, src) {
-  const pgNums = document.getElementById("pgNumbers");
-  pgNums.innerHTML = "";
+/* ── PEKERJAAN MENDESAK (deadline terdekat & belum selesai) ── */
+function renderMendesak() {
+  const now = new Date();
+  const list = filtered
+    .filter(d => d.status !== "Selesai" && parseDate(d.deadline))
+    .map(d => ({ ...d, _diff: Math.ceil((parseDate(d.deadline) - now) / 86400000) }))
+    .filter(d => d._diff <= 5)
+    .sort((a, b) => a._diff - b._diff)
+    .slice(0, 5);
 
-  const makeBtn = n => {
-    const b = document.createElement("button");
-    b.className   = "pg-btn" + (n === currentPage ? " active" : "");
-    b.textContent = n;
-    if (n === currentPage) {
-      b.disabled = true;
-    } else {
-      b.onclick = () => { currentPage = n; renderTable(); };
-    }
-    return b;
-  };
+  document.getElementById("mendesakList").innerHTML = list.map(d => `
+    <div class="mendesak-item">
+      <div class="m-title">${esc(d.pekerjaan)}</div>
+      <div class="m-sub">Deadline ${esc(fmtDateShort(d.deadline))} (${d._diff <= 0 ? 'lewat tenggat' : d._diff + ' hari lagi'})</div>
+    </div>`).join("") || '<div style="color:var(--muted);font-size:12.5px;">Tidak ada pekerjaan mendesak.</div>';
+}
 
-  const makeDots = () => {
-    const s = document.createElement("span");
-    s.textContent = "…";
-    s.style.cssText = "padding:0 4px;color:var(--muted);align-self:center";
-    return s;
-  };
+/* ── AKTIVITAS TERBARU (placeholder dari data terbaru) ──── */
+function renderAktivitas() {
+  const sorted = [...filtered].sort((a, b) => (parseDate(b.tanggal) || 0) - (parseDate(a.tanggal) || 0)).slice(0, 5);
+  document.getElementById("aktivitasList").innerHTML = sorted.map(d => `
+    <div class="aktivitas-item">
+      <span class="a-avatar">${esc(initials(d.pic))}</span>
+      <div class="a-text"><b>${esc(d.pic)}</b> mengupdate progress pekerjaan <b>${esc(d.pekerjaan)}</b> menjadi ${d.progres}%</div>
+    </div>`).join("") || '<div style="color:var(--muted);font-size:12.5px;">Belum ada aktivitas.</div>';
+}
 
-  if (totalPages <= 6) {
-    for (let i = 1; i <= totalPages; i++) pgNums.appendChild(makeBtn(i));
-  } else {
-    pgNums.appendChild(makeBtn(1));
-    if (currentPage > 3) pgNums.appendChild(makeDots());
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-      pgNums.appendChild(makeBtn(i));
-    }
-    if (currentPage < totalPages - 2) pgNums.appendChild(makeDots());
-    pgNums.appendChild(makeBtn(totalPages));
-  }
+/* ── DEADLINE MENDATANG ──────────────────────────────────── */
+function renderDeadline() {
+  const now = new Date();
+  const list = filtered
+    .filter(d => d.status !== "Selesai" && parseDate(d.deadline))
+    .map(d => ({ ...d, _date: parseDate(d.deadline), _diff: Math.ceil((parseDate(d.deadline) - now) / 86400000) }))
+    .sort((a, b) => a._date - b._date)
+    .slice(0, 5);
+
+  document.getElementById("deadlineList").innerHTML = list.map(d => `
+    <div class="deadline-item">
+      <div class="deadline-date">
+        <span class="dd-day">${d._date.getDate()}</span>
+        <span class="dd-mon">${MONTHS_ID[d._date.getMonth()]}</span>
+      </div>
+      <div class="deadline-info">
+        <div class="d-title">${esc(d.pekerjaan)}</div>
+        <div class="d-pic">${esc(d.pic)}</div>
+      </div>
+      <span class="deadline-tag">${d._diff <= 0 ? 'lewat' : d._diff + ' hari lagi'}</span>
+    </div>`).join("") || '<div style="color:var(--muted);font-size:12.5px;">Tidak ada deadline mendatang.</div>';
 }
 
 /* ── MODAL DETAIL ─────────────────────────────────────────── */
 function openModal(idx) {
   if (idx < 0 || idx >= RAW_DATA.length) return;
   const d = RAW_DATA[idx];
-  const labelStatus = d.status === "Berjalan" ? "Proses"
-                    : d.status === "Belum Mulai" ? "Terlambat"
-                    : d.status;
-
   document.getElementById("modalTitle").textContent = d.pekerjaan;
   document.getElementById("modalBody").innerHTML = `
     <table class="modal-table">
-      <tr><th>Status</th><td><span class="badge ${statusBadge[d.status] || 'belum'}">${esc(labelStatus)}</span></td></tr>
+      <tr><th>PIC</th><td>${esc(d.pic)}</td></tr>
+      <tr><th>Prioritas</th><td><span class="prio ${prioCls[d.prioritas] || 'sedang'}">${esc(d.prioritas)}</span></td></tr>
+      <tr><th>Status</th><td><span class="badge ${statusBadgeCls[d.status] || 'review'}">${esc(d.status)}</span></td></tr>
       <tr><th>Progress</th><td>
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="flex:1;height:8px;background:#e8edf5;border-radius:5px;overflow:hidden;">
@@ -422,72 +445,40 @@ function openModal(idx) {
       <tr><th>Triwulan</th><td>${esc(d.triwulan || "-")}</td></tr>
       <tr><th>Bulan</th><td>${esc(d.bulan || "-")}</td></tr>
       <tr><th>Minggu ke</th><td>${esc(d.minggu || "-")}</td></tr>
-      <tr><th>Target</th><td>${esc(d.target || d.tanggal || "-")}</td></tr>
+      <tr><th>Tanggal</th><td>${esc(fmtDateShort(d.tanggal))}</td></tr>
+      <tr><th>Deadline</th><td>${esc(fmtDateShort(d.deadline))}</td></tr>
       <tr><th>Kendala</th><td>${esc(d.kendala || "-")}</td></tr>
       <tr><th>Tindak Lanjut</th><td>${esc(d.tindak || "-")}</td></tr>
     </table>`;
-
   document.getElementById("modalOverlay").classList.add("show");
 }
-
-function closeModal() {
-  document.getElementById("modalOverlay").classList.remove("show");
-}
-
-/* ── DAFTAR KENDALA (tampilkan teks kendala, bukan nama kegiatan) ── */
-function renderKendala() {
-  // FIX #3: tampilkan kolom Kendala (bukan nama kegiatan)
-  const list = filtered.filter(d => d.kendala && d.kendala.trim() !== "");
-  document.getElementById("kendalaList").innerHTML = list.slice(0, 30).map(d => `
-    <div class="acc-item">
-      <span class="item-name">${esc(d.kendala)}</span>
-      <span class="item-tag">${esc(d.pekerjaan)}</span>
-    </div>`
-  ).join("") || '<div class="acc-item"><span class="item-name" style="color:var(--muted)">Tidak ada kendala tercatat.</span></div>';
-}
-
-/* ── TINDAK LANJUT (tampilkan teks tindak lanjut) ────────── */
-function renderTindak() {
-  // FIX #4: tampilkan kolom Tindak Lanjut (bukan nama kegiatan)
-  const list = filtered.filter(d => d.tindak && d.tindak.trim() !== "");
-  document.getElementById("tindakList").innerHTML = list.slice(0, 30).map(d => `
-    <div class="acc-item">
-      <span class="item-name">${esc(d.tindak)}</span>
-      <span class="item-tag">${esc(d.pekerjaan)}</span>
-    </div>`
-  ).join("") || '<div class="acc-item"><span class="item-name" style="color:var(--muted)">Tidak ada tindak lanjut tercatat.</span></div>';
-}
+function closeModal() { document.getElementById("modalOverlay").classList.remove("show"); }
 
 /* ── HELPER: ESCAPE HTML ─────────────────────────────────── */
 function esc(s) {
   if (s == null) return "";
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  }[c]));
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-/* ── EVENT LISTENERS ─────────────────────────────────────── */
+/* ── EVENT LISTENERS ──────────────────────────────────────── */
 document.getElementById("refreshBtn").addEventListener("click", refresh);
 document.getElementById("retryBtn").addEventListener("click", refresh);
-document.getElementById("progFilter").addEventListener("change", renderProg);
+document.getElementById("yearFilter").addEventListener("change", renderBar);
 document.getElementById("searchInput").addEventListener("input", () => { currentPage = 1; renderTable(); });
-document.getElementById("prevPage").addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTable(); } });
-document.getElementById("nextPage").addEventListener("click", () => {
-  const q = document.getElementById("searchInput").value.toLowerCase().trim();
-  const src = q ? filtered.filter(d => d.pekerjaan.toLowerCase().includes(q)) : filtered;
-  const t = Math.max(1, Math.ceil(src.length / PAGE_SIZE));
-  if (currentPage < t) { currentPage++; renderTable(); }
-});
-
-// Filter dropdowns
-["filterTriwulan","filterBulan","filterMinggu","filterStatus"].forEach(id => {
+["filterTriwulan","filterBulan","filterMinggu","filterPic"].forEach(id => {
   document.getElementById(id).addEventListener("change", applyFilters);
 });
-document.getElementById("resetFilter").addEventListener("click", resetFilter);
-
-// Tutup modal dengan tombol ESC
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
-/* ── INIT ────────────────────────────────────────────────── */
+// Sidebar nav: highlight aktif (placeholder single-page)
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", e => {
+    e.preventDefault();
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    item.classList.add("active");
+  });
+});
+
+/* ── INIT ─────────────────────────────────────────────────── */
 refresh();
 setInterval(refresh, AUTO_REFRESH_MS);
